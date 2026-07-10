@@ -204,7 +204,13 @@ export default function useWebRTC(socket, roomId) {
 
     // Receive an offer from another user
     const handleOffer = async ({ from, offer }) => {
-      const pc = createPeerConnection(from, 'Peer');
+      let peer = peersRef.current[from];
+      let pc;
+      if (peer && peer.peerConnection.connectionState !== 'closed') {
+        pc = peer.peerConnection;
+      } else {
+        pc = createPeerConnection(from, 'Peer');
+      }
       if (!pc) return;
 
       try {

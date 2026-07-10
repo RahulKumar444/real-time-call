@@ -138,31 +138,29 @@ export default function Room() {
         </div>
 
         {/* Right Side: Toggleable Side Panels */}
-        {activePanel && (
-          <aside className="room-sidebar animate-slide-in">
-            <div className="sidebar-header">
-              <h3>
-                {activePanel === 'chat' && 'Room Chat'}
-                {activePanel === 'whiteboard' && 'Collaborative Canvas'}
-                {activePanel === 'files' && 'Shared Documents'}
-              </h3>
-              <button className="btn-close" onClick={() => setActivePanel(null)}>
-                ×
-              </button>
+        <aside className="room-sidebar animate-slide-in" style={{ display: activePanel ? 'flex' : 'none' }}>
+          <div className="sidebar-header">
+            <h3>
+              {activePanel === 'chat' && 'Room Chat'}
+              {activePanel === 'whiteboard' && 'Collaborative Canvas'}
+              {activePanel === 'files' && 'Shared Documents'}
+            </h3>
+            <button className="btn-close" onClick={() => setActivePanel(null)}>
+              ×
+            </button>
+          </div>
+          <div className="sidebar-body">
+            <div style={{ display: activePanel === 'chat' ? 'block' : 'none', height: '100%' }}>
+              <Chat socket={socket} roomId={roomId} userName={user?.name || 'User'} />
             </div>
-            <div className="sidebar-body">
-              {activePanel === 'chat' && (
-                <Chat socket={socket} roomId={roomId} userName={user?.name || 'User'} />
-              )}
-              {activePanel === 'whiteboard' && (
-                <Whiteboard socket={socket} roomId={roomId} />
-              )}
-              {activePanel === 'files' && (
-                <FileShare socket={socket} roomId={roomId} />
-              )}
+            <div style={{ display: activePanel === 'whiteboard' ? 'block' : 'none', height: '100%' }}>
+              <Whiteboard socket={socket} roomId={roomId} />
             </div>
-          </aside>
-        )}
+            <div style={{ display: activePanel === 'files' ? 'block' : 'none', height: '100%' }}>
+              <FileShare socket={socket} roomId={roomId} />
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
