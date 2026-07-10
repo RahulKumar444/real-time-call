@@ -14,71 +14,16 @@ export default function Whiteboard({ socket, roomId }) {
   const ctxRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef(null);
+  const canvasReadyRef = useRef(false);
+  const drawBufferRef = useRef([]); // Buffer for strokes that arrive before canvas is ready
 
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState('#ffffff');
   const [lineWidth, setLineWidth] = useState(5);
 
-  // Initialize and resize canvas using ResizeObserver
-  // This correctly handles the case where the container starts with display:none
-  // and later becomes visible
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const resizeCanvas = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = container.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-
-      // Save current drawing before resize
-      let prevData = null;
-      if (ctxRef.current && canvas.width > 0 && canvas.height > 0) {
-        try {
-          prevData = ctxRef.current.getImageData(0, 0, canvas.width, canvas.height);
-        } catch (e) {
-          // ignore if canvas was never drawn to
-        }
-      }
-
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-      const ctx = canvas.getContext('2d');
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctxRef.current = ctx;
-
-      // Fill with dark background
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Restore previous drawing if possible
-      if (prevData) {
-        ctx.putImageData(prevData, 0, 0);
-      }
-    };
-
-    // Use ResizeObserver to detect when container becomes visible / changes size
-    const observer = new ResizeObserver(() => {
-      resizeCanvas();
-    });
-    observer.observe(container);
-
-    // Also try initializing immediately
-    resizeCanvas();
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  // Draw function for both local and remote
-  const drawOnCanvas = useCallback((data) => {
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-    if (!data || !data.points || data.points.length < 2) return;
+  // Core draw function — draws a single stroke on the canvas
+  const drawStroke = useCallback((ctx, data) => {
+    if (!ctx || !data || !data.points || data.points.length < 2) return;
 
     ctx.beginPath();
     ctx.strokeStyle = data.type === 'erase' ? '#1a1a2e' : data.color;
@@ -94,6 +39,81 @@ export default function Whiteboard({ socket, roomId }) {
     ctx.stroke();
   }, []);
 
+  // Draw on canvas (or buffer if canvas not ready)
+  const drawOnCanvas = useCallback((data) => {
+    if (canvasReadyRef.current && ctxRef.current) {
+      drawStroke(ctxRef.current, data);
+    } else {
+      // Canvas not ready yet — buffer the stroke to replay later
+      drawBufferRef.current.push(data);
+    }
+  }, [drawStroke]);
+
+  // Initialize and resize canvas using ResizeObserver
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const initCanvas = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = container.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      // Already initialized with same size — skip
+      if (canvasReadyRef.current && canvas.width === Math.floor(rect.width) && canvas.height === Math.floor(rect.height)) return;
+
+      // Save current drawing before resize
+      let prevData = null;
+      if (ctxRef.current && canvas.width > 0 && canvas.height > 0) {
+        try {
+          prevData = ctxRef.current.getImageData(0, 0, canvas.width, canvas.height);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      canvas.width = Math.floor(rect.width);
+      canvas.height = Math.floor(rect.height);
+      const ctx = canvas.getContext('2d');
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctxRef.current = ctx;
+
+      // Fill with dark background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Restore previous drawing if possible
+      if (prevData) {
+        ctx.putImageData(prevData, 0, 0);
+      }
+
+      // Canvas is now ready — replay any buffered strokes
+      if (!canvasReadyRef.current) {
+        canvasReadyRef.current = true;
+        const buffer = drawBufferRef.current;
+        drawBufferRef.current = [];
+        for (const stroke of buffer) {
+          drawStroke(ctx, stroke);
+        }
+      }
+    };
+
+    const observer = new ResizeObserver(() => {
+      initCanvas();
+    });
+    observer.observe(container);
+
+    // Also try immediately
+    initCanvas();
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [drawStroke]);
+
   // Listen for remote draw events
   useEffect(() => {
     if (!socket) return;
@@ -103,6 +123,9 @@ export default function Whiteboard({ socket, roomId }) {
     };
 
     const handleRemoteClear = () => {
+      // Clear the buffer too
+      drawBufferRef.current = [];
+
       const ctx = ctxRef.current;
       const canvas = canvasRef.current;
       if (ctx && canvas) {
@@ -170,6 +193,7 @@ export default function Whiteboard({ socket, roomId }) {
   };
 
   const clearCanvas = () => {
+    drawBufferRef.current = [];
     const ctx = ctxRef.current;
     const canvas = canvasRef.current;
     if (ctx && canvas) {

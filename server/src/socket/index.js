@@ -73,10 +73,12 @@ function registerSocketHandlers(io) {
 
     // --- Whiteboard -------------------------------------------------------
     socket.on('draw', ({ roomId, drawData }) => {
+      console.log(`[WB] draw from ${socket.user.name} in room ${roomId}`);
       socket.to(roomId).emit('draw', drawData);
     });
 
     socket.on('clear-whiteboard', ({ roomId }) => {
+      console.log(`[WB] clear from ${socket.user.name} in room ${roomId}`);
       socket.to(roomId).emit('clear-whiteboard');
     });
 
