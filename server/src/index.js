@@ -34,8 +34,19 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 // --- Middleware -------------------------------------------------------------
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const allowedOrigins = CLIENT_URL.split(',').map(o => o.trim());
 
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow server-to-server or requests with no origin (like mobile/Postman) or if origin is in the allowed list
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Serve uploaded files statically
@@ -72,7 +83,7 @@ app.use('/api/files', fileRoutes);
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: CLIENT_URL,
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
 });
