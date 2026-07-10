@@ -64,8 +64,6 @@ export default function useWebRTC(socket, roomId) {
   // Create a new peer connection for a given target socket
   const createPeerConnection = useCallback(
     (targetSocketId, userName) => {
-      if (!localStreamRef.current) return null;
-
       // Close existing connection if any
       if (peersRef.current[targetSocketId]) {
         peersRef.current[targetSocketId].peerConnection.close();
@@ -74,10 +72,12 @@ export default function useWebRTC(socket, roomId) {
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // Add local tracks to the peer connection
-      localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current);
-      });
+      // Add local tracks to the peer connection if they exist
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => {
+          pc.addTrack(track, localStreamRef.current);
+        });
+      }
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
@@ -308,7 +308,7 @@ export default function useWebRTC(socket, roomId) {
       screenStreamRef.current = screenStream;
 
       // Save the original camera video track
-      const originalTrack = localStreamRef.current.getVideoTracks()[0];
+      const originalTrack = localStreamRef.current ? localStreamRef.current.getVideoTracks()[0] : null;
       originalVideoTrackRef.current = originalTrack;
 
       // Replace video track in all peer connections
@@ -318,13 +318,23 @@ export default function useWebRTC(socket, roomId) {
           .find((s) => s.track && s.track.kind === 'video');
         if (sender) {
           sender.replaceTrack(screenTrack);
+        } else if (peerConnection.connectionState !== 'closed') {
+          // If no sender (because no camera was active), add track to peer connection
+          peerConnection.addTrack(screenTrack, screenStream);
         }
       });
 
       // Replace video track in local stream for local display
-      localStreamRef.current.removeTrack(originalTrack);
-      localStreamRef.current.addTrack(screenTrack);
-      setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      if (localStreamRef.current) {
+        if (originalTrack) {
+          localStreamRef.current.removeTrack(originalTrack);
+        }
+        localStreamRef.current.addTrack(screenTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      } else {
+        localStreamRef.current = new MediaStream([screenTrack]);
+        setLocalStream(localStreamRef.current);
+      }
       setIsScreenSharing(true);
 
       // When user clicks the browser's "Stop sharing" button
@@ -358,12 +368,14 @@ export default function useWebRTC(socket, roomId) {
     }
 
     // Restore local stream
-    const currentScreenTrack = localStreamRef.current.getVideoTracks()[0];
-    if (currentScreenTrack) {
-      localStreamRef.current.removeTrack(currentScreenTrack);
+    if (localStreamRef.current) {
+      const currentScreenTrack = localStreamRef.current.getVideoTracks()[0];
+      if (currentScreenTrack) {
+        localStreamRef.current.removeTrack(currentScreenTrack);
+      }
+      localStreamRef.current.addTrack(originalTrack);
+      setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
     }
-    localStreamRef.current.addTrack(originalTrack);
-    setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
     setIsScreenSharing(false);
     originalVideoTrackRef.current = null;
   }, []);
