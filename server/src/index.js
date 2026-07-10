@@ -57,6 +57,11 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Root path handler to avoid confusing "Cannot GET /" page
+app.get('/', (_req, res) => {
+  res.send('<h1>SyncSpace API Server is running!</h1><p>This is the backend API. Please visit the frontend client application to use the interface.</p>');
+});
+
 // Auth routes with rate limiting
 app.use('/api/auth', authLimiter, authRoutes);
 
