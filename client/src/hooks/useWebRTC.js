@@ -14,6 +14,7 @@ export default function useWebRTC(socket, roomId) {
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState({}); // socketId -> { stream, userName }
+  const [peersList, setPeersList] = useState([]); // Array of { socketId, userId, userName }
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -167,10 +168,11 @@ export default function useWebRTC(socket, roomId) {
     // When we get the list of existing users in the room,
     // we (the newcomer) create an offer to EACH existing user.
     const handleRoomUsers = async (users) => {
-      for (const user of users) {
-        // Don't create connection to ourselves
-        if (user.socketId === socket.id) continue;
+      // Keep track of the active users in the room (excluding ourselves)
+      const otherUsers = users.filter((u) => u.socketId !== socket.id);
+      setPeersList(otherUsers);
 
+      for (const user of otherUsers) {
         const pc = createPeerConnection(user.socketId, user.userName);
         if (!pc) continue;
 
@@ -187,12 +189,17 @@ export default function useWebRTC(socket, roomId) {
     // When a new user joins after us — we wait for their offer
     const handleUserJoined = (userData) => {
       console.log('User joined:', userData.userName);
+      setPeersList((prev) => {
+        if (prev.some((p) => p.socketId === userData.socketId)) return prev;
+        return [...prev, userData];
+      });
     };
 
     // When a user leaves
     const handleUserLeft = (userData) => {
       console.log('User left:', userData.userName);
       closePeerConnection(userData.socketId);
+      setPeersList((prev) => prev.filter((p) => p.socketId !== userData.socketId));
     };
 
     // Receive an offer from another user
@@ -396,6 +403,7 @@ export default function useWebRTC(socket, roomId) {
   return {
     localStream,
     remoteStreams,
+    peersList,
     isAudioEnabled,
     isVideoEnabled,
     isScreenSharing,

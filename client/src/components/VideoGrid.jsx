@@ -34,8 +34,8 @@ function VideoTile({ stream, userName, isMuted, isLocal }) {
   );
 }
 
-export default function VideoGrid({ localStream, remoteStreams, userName, isAudioEnabled }) {
-  const totalParticipants = 1 + Object.keys(remoteStreams).length;
+export default function VideoGrid({ localStream, remoteStreams, peersList = [], userName, isAudioEnabled }) {
+  const totalParticipants = 1 + peersList.length;
 
   const getGridClass = () => {
     if (totalParticipants === 1) return 'grid-1';
@@ -52,11 +52,11 @@ export default function VideoGrid({ localStream, remoteStreams, userName, isAudi
         isMuted={!isAudioEnabled}
         isLocal={true}
       />
-      {Object.entries(remoteStreams).map(([socketId, { stream, userName: peerName }]) => (
+      {peersList.map((peer) => (
         <VideoTile
-          key={socketId}
-          stream={stream}
-          userName={peerName}
+          key={peer.socketId}
+          stream={remoteStreams[peer.socketId]?.stream || null}
+          userName={peer.userName}
           isMuted={false}
           isLocal={false}
         />

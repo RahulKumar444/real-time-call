@@ -18,6 +18,7 @@ export default function Room() {
   const {
     localStream,
     remoteStreams,
+    peersList,
     isAudioEnabled,
     isVideoEnabled,
     isScreenSharing,
@@ -33,8 +34,8 @@ export default function Room() {
 
   // Update participant count
   useEffect(() => {
-    setParticipantsCount(1 + Object.keys(remoteStreams).length);
-  }, [remoteStreams]);
+    setParticipantsCount(1 + peersList.length);
+  }, [peersList]);
 
   const handleCopyRoomId = async () => {
     try {
@@ -130,6 +131,7 @@ export default function Room() {
           <VideoGrid
             localStream={localStream}
             remoteStreams={remoteStreams}
+            peersList={peersList}
             userName={user?.name || 'You'}
             isAudioEnabled={isAudioEnabled}
           />
