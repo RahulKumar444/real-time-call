@@ -80,6 +80,10 @@ registerSocketHandlers(io);
 const PORT = process.env.PORT || 5000;
 
 async function start() {
+  console.log('DEBUG: DB_HOST =', process.env.DB_HOST);
+  console.log('DEBUG: DB_PORT =', process.env.DB_PORT);
+  console.log('DEBUG: DB_USER =', process.env.DB_USER);
+  console.log('DEBUG: DB_NAME =', process.env.DB_NAME);
   await connectDB();
 
   server.listen(PORT, () => {
