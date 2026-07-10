@@ -1,0 +1,40 @@
+# Node dependencies
+node_modules/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Build output
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# Uploaded files and temporary folders
+uploads/
+server/uploads/
+
+# Vite output
+client/dist/
+
+# Dependency directories for subprojects
+client/node_modules/
+server/node_modules/
+
+# Local env examples should remain committed, actual env files should not
+client/.env
+server/.env
