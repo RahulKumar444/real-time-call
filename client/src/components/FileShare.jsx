@@ -88,7 +88,7 @@ export default function FileShare({ socket, roomId }) {
     }
   };
 
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const baseURL = import.meta.env.VITE_API_URL || 'https://real-time-call.onrender.com';
 
   return (
     <div className="fileshare-panel">
