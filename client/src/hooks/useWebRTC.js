@@ -160,7 +160,7 @@ export default function useWebRTC(socket, roomId) {
 
   // Socket event handlers for WebRTC signaling
   useEffect(() => {
-    if (!socket || !localStreamRef.current || !roomId) return;
+    if (!socket || !roomId) return;
 
     // Join the room
     socket.emit('join-room', { roomId });
