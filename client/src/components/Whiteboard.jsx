@@ -73,7 +73,7 @@ export default function Whiteboard({ socket, roomId }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleDraw = ({ drawData }) => {
+    const handleDraw = (drawData) => {
       drawOnCanvas(drawData);
     };
 

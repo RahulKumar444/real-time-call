@@ -319,15 +319,24 @@ export default function useWebRTC(socket, roomId) {
       originalVideoTrackRef.current = originalTrack;
 
       // Replace video track in all peer connections
-      Object.values(peersRef.current).forEach(({ peerConnection }) => {
+      Object.entries(peersRef.current).forEach(([targetSocketId, { peerConnection }]) => {
         const sender = peerConnection
           .getSenders()
           .find((s) => s.track && s.track.kind === 'video');
         if (sender) {
           sender.replaceTrack(screenTrack);
         } else if (peerConnection.connectionState !== 'closed') {
-          // If no sender (because no camera was active), add track to peer connection
           peerConnection.addTrack(screenTrack, screenStream);
+          // Trigger renegotiation manually since we added a new track
+          (async () => {
+            try {
+              const offer = await peerConnection.createOffer();
+              await peerConnection.setLocalDescription(offer);
+              socket.emit('offer', { to: targetSocketId, offer });
+            } catch (err) {
+              console.error('Error negotiating screen share:', err);
+            }
+          })();
         }
       });
 
@@ -351,20 +360,33 @@ export default function useWebRTC(socket, roomId) {
     } catch (err) {
       console.error('Error starting screen share:', err);
     }
-  }, []);
+  }, [socket]);
 
   // Stop screen sharing
   const stopScreenShare = useCallback(() => {
     const originalTrack = originalVideoTrackRef.current;
-    if (!originalTrack) return;
 
-    // Replace screen track with camera track in all peer connections
-    Object.values(peersRef.current).forEach(({ peerConnection }) => {
+    // Replace screen track with camera track or remove it in all peer connections
+    Object.entries(peersRef.current).forEach(([targetSocketId, { peerConnection }]) => {
       const sender = peerConnection
         .getSenders()
         .find((s) => s.track && s.track.kind === 'video');
       if (sender) {
-        sender.replaceTrack(originalTrack);
+        if (originalTrack) {
+          sender.replaceTrack(originalTrack);
+        } else {
+          peerConnection.removeTrack(sender);
+          // Trigger renegotiation manually since we removed the track
+          (async () => {
+            try {
+              const offer = await peerConnection.createOffer();
+              await peerConnection.setLocalDescription(offer);
+              socket.emit('offer', { to: targetSocketId, offer });
+            } catch (err) {
+              console.error('Error negotiating stop screen share:', err);
+            }
+          })();
+        }
       }
     });
 
@@ -380,12 +402,17 @@ export default function useWebRTC(socket, roomId) {
       if (currentScreenTrack) {
         localStreamRef.current.removeTrack(currentScreenTrack);
       }
-      localStreamRef.current.addTrack(originalTrack);
-      setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      if (originalTrack) {
+        localStreamRef.current.addTrack(originalTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      } else {
+        setLocalStream(null);
+        localStreamRef.current = null;
+      }
     }
     setIsScreenSharing(false);
     originalVideoTrackRef.current = null;
-  }, []);
+  }, [socket]);
 
   // Cleanup on unmount
   useEffect(() => {
