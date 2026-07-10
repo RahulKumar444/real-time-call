@@ -82,7 +82,7 @@ function registerSocketHandlers(io) {
 
     // --- Chat -------------------------------------------------------------
     socket.on('chat-message', ({ roomId, message }) => {
-      io.to(roomId).emit('chat-message', {
+      socket.to(roomId).emit('chat-message', {
         from: socket.user.name,
         message,
         timestamp: new Date().toISOString(),

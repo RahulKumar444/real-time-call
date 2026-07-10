@@ -10,31 +10,38 @@ const LINE_WIDTHS = [
 
 export default function Whiteboard({ socket, roomId }) {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const ctxRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef(null);
-  const canvasInitializedRef = useRef(false);
 
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState('#ffffff');
   const [lineWidth, setLineWidth] = useState(5);
 
-  // Initialize canvas — only run once
+  // Initialize and resize canvas using ResizeObserver
+  // This correctly handles the case where the container starts with display:none
+  // and later becomes visible
   useEffect(() => {
-    if (canvasInitializedRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     const resizeCanvas = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      const rect = parent.getBoundingClientRect();
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = container.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
 
       // Save current drawing before resize
-      const prevData = ctxRef.current
-        ? ctxRef.current.getImageData(0, 0, canvas.width, canvas.height)
-        : null;
+      let prevData = null;
+      if (ctxRef.current && canvas.width > 0 && canvas.height > 0) {
+        try {
+          prevData = ctxRef.current.getImageData(0, 0, canvas.width, canvas.height);
+        } catch (e) {
+          // ignore if canvas was never drawn to
+        }
+      }
 
       canvas.width = rect.width;
       canvas.height = rect.height;
@@ -47,22 +54,23 @@ export default function Whiteboard({ socket, roomId }) {
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Restore drawing if possible
+      // Restore previous drawing if possible
       if (prevData) {
         ctx.putImageData(prevData, 0, 0);
       }
     };
 
-    // Use a small timeout to ensure the parent has been rendered
-    const timer = setTimeout(() => {
+    // Use ResizeObserver to detect when container becomes visible / changes size
+    const observer = new ResizeObserver(() => {
       resizeCanvas();
-      canvasInitializedRef.current = true;
-    }, 100);
+    });
+    observer.observe(container);
 
-    window.addEventListener('resize', resizeCanvas);
+    // Also try initializing immediately
+    resizeCanvas();
+
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', resizeCanvas);
+      observer.disconnect();
     };
   }, []);
 
@@ -222,7 +230,7 @@ export default function Whiteboard({ socket, roomId }) {
         </button>
       </div>
 
-      <div className="wb-canvas-container">
+      <div className="wb-canvas-container" ref={containerRef}>
         <canvas
           ref={canvasRef}
           className="wb-canvas"
