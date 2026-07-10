@@ -13,55 +13,72 @@ export default function Whiteboard({ socket, roomId }) {
   const ctxRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef(null);
+  const canvasInitializedRef = useRef(false);
 
-  const [tool, setTool] = useState('pen'); // 'pen' | 'eraser'
+  const [tool, setTool] = useState('pen');
   const [color, setColor] = useState('#ffffff');
   const [lineWidth, setLineWidth] = useState(5);
 
-  // Initialize canvas
+  // Initialize canvas — only run once
   useEffect(() => {
+    if (canvasInitializedRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
+      if (!parent) return;
       const rect = parent.getBoundingClientRect();
-      // Save current drawing
+      if (rect.width === 0 || rect.height === 0) return;
+
+      // Save current drawing before resize
       const prevData = ctxRef.current
         ? ctxRef.current.getImageData(0, 0, canvas.width, canvas.height)
         : null;
+
       canvas.width = rect.width;
       canvas.height = rect.height;
       const ctx = canvas.getContext('2d');
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctxRef.current = ctx;
+
       // Fill with dark background
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
       // Restore drawing if possible
       if (prevData) {
         ctx.putImageData(prevData, 0, 0);
       }
     };
 
-    resizeCanvas();
+    // Use a small timeout to ensure the parent has been rendered
+    const timer = setTimeout(() => {
+      resizeCanvas();
+      canvasInitializedRef.current = true;
+    }, 100);
+
     window.addEventListener('resize', resizeCanvas);
-    return () => window.removeEventListener('resize', resizeCanvas);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', resizeCanvas);
+    };
   }, []);
 
   // Draw function for both local and remote
-  const drawOnCanvas = useCallback((drawData) => {
+  const drawOnCanvas = useCallback((data) => {
     const ctx = ctxRef.current;
-    if (!ctx || !drawData.points || drawData.points.length < 2) return;
+    if (!ctx) return;
+    if (!data || !data.points || data.points.length < 2) return;
 
     ctx.beginPath();
-    ctx.strokeStyle = drawData.type === 'erase' ? '#1a1a2e' : drawData.color;
-    ctx.lineWidth = drawData.type === 'erase' ? drawData.lineWidth * 3 : drawData.lineWidth;
+    ctx.strokeStyle = data.type === 'erase' ? '#1a1a2e' : data.color;
+    ctx.lineWidth = data.type === 'erase' ? data.lineWidth * 3 : data.lineWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    const points = drawData.points;
+    const points = data.points;
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
       ctx.lineTo(points[i].x, points[i].y);
@@ -73,11 +90,11 @@ export default function Whiteboard({ socket, roomId }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleDraw = (drawData) => {
+    const handleRemoteDraw = (drawData) => {
       drawOnCanvas(drawData);
     };
 
-    const handleClear = () => {
+    const handleRemoteClear = () => {
       const ctx = ctxRef.current;
       const canvas = canvasRef.current;
       if (ctx && canvas) {
@@ -86,18 +103,19 @@ export default function Whiteboard({ socket, roomId }) {
       }
     };
 
-    socket.on('draw', handleDraw);
-    socket.on('clear-whiteboard', handleClear);
+    socket.on('draw', handleRemoteDraw);
+    socket.on('clear-whiteboard', handleRemoteClear);
 
     return () => {
-      socket.off('draw', handleDraw);
-      socket.off('clear-whiteboard', handleClear);
+      socket.off('draw', handleRemoteDraw);
+      socket.off('clear-whiteboard', handleRemoteClear);
     };
   }, [socket, drawOnCanvas]);
 
   // Get position from event
   const getPos = (e) => {
     const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     if (e.touches) {
       return {

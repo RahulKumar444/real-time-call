@@ -28,7 +28,7 @@
 
 .video-tile {
   position: relative;
-  background: var(--bg-secondary);
+  background: linear-gradient(145deg, #13131a 0%, #1a1a2e 100%);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-glass);
   overflow: hidden;
@@ -36,11 +36,12 @@
   align-items: center;
   justify-content: center;
   min-height: 200px;
-  transition: border-color var(--transition-normal);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .video-tile:hover {
   border-color: var(--border-glass-hover);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
 .video-element {
@@ -55,36 +56,55 @@
 }
 
 .video-avatar {
-  width: 80px;
-  height: 80px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   background: var(--accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 2.2rem;
   font-weight: 700;
   color: #fff;
+  box-shadow: 0 4px 24px var(--accent-glow);
+  animation: avatarPulse 3s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+  0%, 100% {
+    box-shadow: 0 4px 24px var(--accent-glow);
+  }
+  50% {
+    box-shadow: 0 4px 36px rgba(108, 99, 255, 0.5);
+  }
 }
 
 .video-label {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 10px;
+  left: 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 4px 10px;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 5px 14px;
   border-radius: 999px;
   font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .video-name {
   color: #fff;
   font-weight: 500;
+}
+
+.sharing-badge {
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 600;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .muted-icon {
@@ -93,5 +113,5 @@
 
 .local-tile {
   border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  box-shadow: 0 0 12px var(--accent-glow);
 }

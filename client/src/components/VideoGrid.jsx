@@ -1,16 +1,20 @@
 import { useRef, useEffect } from 'react';
 import './VideoGrid.css';
 
-function VideoTile({ stream, userName, isMuted, isLocal }) {
+function VideoTile({ stream, userName, isMuted, isLocal, isScreenSharing }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    if (videoRef.current) {
+      if (stream) {
+        videoRef.current.srcObject = stream;
+      } else {
+        videoRef.current.srcObject = null;
+      }
     }
   }, [stream]);
 
-  const hasVideo = stream && stream.getVideoTracks().some((t) => t.enabled);
+  const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live');
 
   return (
     <div className={`video-tile ${isLocal ? 'local-tile' : ''}`}>
@@ -28,13 +32,14 @@ function VideoTile({ stream, userName, isMuted, isLocal }) {
       )}
       <div className="video-label">
         <span className="video-name">{isLocal ? 'You' : userName || 'Peer'}</span>
+        {isLocal && isScreenSharing && <span className="sharing-badge">📺 Sharing</span>}
         {isMuted && <span className="muted-icon">🔇</span>}
       </div>
     </div>
   );
 }
 
-export default function VideoGrid({ localStream, remoteStreams, peersList = [], userName, isAudioEnabled }) {
+export default function VideoGrid({ localStream, remoteStreams, peersList = [], userName, isAudioEnabled, isScreenSharing }) {
   const totalParticipants = 1 + peersList.length;
 
   const getGridClass = () => {
@@ -51,6 +56,7 @@ export default function VideoGrid({ localStream, remoteStreams, peersList = [], 
         userName={userName}
         isMuted={!isAudioEnabled}
         isLocal={true}
+        isScreenSharing={isScreenSharing}
       />
       {peersList.map((peer) => (
         <VideoTile
@@ -59,6 +65,7 @@ export default function VideoGrid({ localStream, remoteStreams, peersList = [], 
           userName={peer.userName}
           isMuted={false}
           isLocal={false}
+          isScreenSharing={false}
         />
       ))}
     </div>

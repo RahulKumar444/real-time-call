@@ -28,14 +28,10 @@ export default function Room() {
     stopScreenShare,
   } = useWebRTC(socket, roomId);
 
-  const [activePanel, setActivePanel] = useState('chat'); // 'chat' | 'whiteboard' | 'files' | null
+  const [activePanel, setActivePanel] = useState('chat');
   const [copied, setCopied] = useState(false);
-  const [participantsCount, setParticipantsCount] = useState(1);
 
-  // Update participant count
-  useEffect(() => {
-    setParticipantsCount(1 + peersList.length);
-  }, [peersList]);
+  const participantsCount = 1 + peersList.length;
 
   const handleCopyRoomId = async () => {
     try {
@@ -81,21 +77,21 @@ export default function Room() {
             onClick={toggleAudio}
             title={isAudioEnabled ? 'Mute Mic' : 'Unmute Mic'}
           >
-            {isAudioEnabled ? '🎤' : '🎙️'}
+            {isAudioEnabled ? '🎤' : '🔇'}
           </button>
           <button
             className={`btn-control ${isVideoEnabled ? 'active' : 'disabled'}`}
             onClick={toggleVideo}
             title={isVideoEnabled ? 'Stop Video' : 'Start Video'}
           >
-            {isVideoEnabled ? '📷' : '📹'}
+            {isVideoEnabled ? '📷' : '📷'}
           </button>
           <button
             className={`btn-control ${isScreenSharing ? 'active-share' : ''}`}
             onClick={isScreenSharing ? stopScreenShare : startScreenShare}
             title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
           >
-            🖥️ {isScreenSharing ? 'Sharing' : 'Share'}
+            🖥️
           </button>
         </div>
 
@@ -134,11 +130,12 @@ export default function Room() {
             peersList={peersList}
             userName={user?.name || 'You'}
             isAudioEnabled={isAudioEnabled}
+            isScreenSharing={isScreenSharing}
           />
         </div>
 
-        {/* Right Side: Toggleable Side Panels */}
-        <aside className="room-sidebar animate-slide-in" style={{ display: activePanel ? 'flex' : 'none' }}>
+        {/* Right Side: Side Panels — always mounted, toggled via display */}
+        <aside className="room-sidebar" style={{ display: activePanel ? 'flex' : 'none' }}>
           <div className="sidebar-header">
             <h3>
               {activePanel === 'chat' && 'Room Chat'}
@@ -150,13 +147,13 @@ export default function Room() {
             </button>
           </div>
           <div className="sidebar-body">
-            <div style={{ display: activePanel === 'chat' ? 'block' : 'none', height: '100%' }}>
+            <div style={{ display: activePanel === 'chat' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
               <Chat socket={socket} roomId={roomId} userName={user?.name || 'User'} />
             </div>
-            <div style={{ display: activePanel === 'whiteboard' ? 'block' : 'none', height: '100%' }}>
+            <div style={{ display: activePanel === 'whiteboard' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
               <Whiteboard socket={socket} roomId={roomId} />
             </div>
-            <div style={{ display: activePanel === 'files' ? 'block' : 'none', height: '100%' }}>
+            <div style={{ display: activePanel === 'files' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
               <FileShare socket={socket} roomId={roomId} />
             </div>
           </div>
