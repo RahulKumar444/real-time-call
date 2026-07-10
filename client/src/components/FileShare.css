@@ -1,0 +1,115 @@
+/* ========== File Share Panel ========== */
+.fileshare-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fileshare-upload {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.fileshare-upload-btn {
+  width: 100%;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.fileshare-upload-btn.uploading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.fileshare-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fileshare-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fileshare-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.fileshare-empty span {
+  font-size: 2rem;
+}
+
+.fileshare-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+}
+
+.fileshare-item:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-glass-hover);
+  transform: translateY(-1px);
+}
+
+.fileshare-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.fileshare-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fileshare-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileshare-size {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.fileshare-download {
+  color: var(--accent);
+  font-size: 1rem;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.fileshare-item:hover .fileshare-download {
+  opacity: 1;
+}
