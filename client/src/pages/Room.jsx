@@ -147,14 +147,31 @@ export default function Room() {
             </button>
           </div>
           <div className="sidebar-body">
-            <div style={{ display: activePanel === 'chat' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
-              <Chat socket={socket} roomId={roomId} userName={user?.name || 'User'} />
-            </div>
-            <div style={{ display: activePanel === 'whiteboard' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
-              <Whiteboard socket={socket} roomId={roomId} />
-            </div>
-            <div style={{ display: activePanel === 'files' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
-              <FileShare socket={socket} roomId={roomId} />
+            <div className="sidebar-panel-stack" style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                display: 'flex', flexDirection: 'column',
+                visibility: activePanel === 'chat' ? 'visible' : 'hidden',
+                zIndex: activePanel === 'chat' ? 2 : 1,
+              }}>
+                <Chat socket={socket} roomId={roomId} userName={user?.name || 'User'} />
+              </div>
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                display: 'flex', flexDirection: 'column',
+                visibility: activePanel === 'whiteboard' ? 'visible' : 'hidden',
+                zIndex: activePanel === 'whiteboard' ? 2 : 1,
+              }}>
+                <Whiteboard socket={socket} roomId={roomId} />
+              </div>
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                display: 'flex', flexDirection: 'column',
+                visibility: activePanel === 'files' ? 'visible' : 'hidden',
+                zIndex: activePanel === 'files' ? 2 : 1,
+              }}>
+                <FileShare socket={socket} roomId={roomId} />
+              </div>
             </div>
           </div>
         </aside>

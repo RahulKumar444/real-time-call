@@ -4,14 +4,30 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
 };
 
 export default function useWebRTC(socket, roomId) {
   const localStreamRef = useRef(null);
-  const peersRef = useRef({}); // socketId -> { peerConnection, userName }
+  const peersRef = useRef({});
   const pendingCandidatesRef = useRef({});
   const socketRef = useRef(socket);
+  const mediaReadyRef = useRef(false);
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState({});
@@ -110,22 +126,14 @@ export default function useWebRTC(socket, roomId) {
 
       // Handle connection state changes
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        console.log(`[WebRTC] ${targetSocketId} state: ${pc.connectionState}`);
+        if (pc.connectionState === 'failed') {
           closePeerConnection(targetSocketId);
         }
       };
 
-      // Handle negotiation needed (for screen share renegotiation)
-      pc.onnegotiationneeded = async () => {
-        try {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          if (socketRef.current) {
-            socketRef.current.emit('offer', { to: targetSocketId, offer });
-          }
-        } catch (err) {
-          console.error('Negotiation error:', err);
-        }
+      pc.oniceconnectionstatechange = () => {
+        console.log(`[WebRTC] ${targetSocketId} ICE state: ${pc.iceConnectionState}`);
       };
 
       peersRef.current[targetSocketId] = { peerConnection: pc, userName };
@@ -150,6 +158,7 @@ export default function useWebRTC(socket, roomId) {
           return;
         }
         localStreamRef.current = stream;
+        mediaReadyRef.current = true;
         setLocalStream(stream);
         setIsAudioEnabled(true);
         setIsVideoEnabled(true);
@@ -169,6 +178,7 @@ export default function useWebRTC(socket, roomId) {
           return;
         }
         localStreamRef.current = audioStream;
+        mediaReadyRef.current = true;
         setLocalStream(audioStream);
         setIsAudioEnabled(true);
         setIsVideoEnabled(false);
@@ -177,8 +187,9 @@ export default function useWebRTC(socket, roomId) {
         console.warn('Mic not available:', err.message);
       }
 
-      // No devices available — that's fine, we proceed without media
-      console.log('No media devices available, proceeding without camera/mic');
+      // No devices — proceed without
+      console.log('No media devices available');
+      mediaReadyRef.current = true;
       setIsAudioEnabled(false);
       setIsVideoEnabled(false);
     };
@@ -189,6 +200,39 @@ export default function useWebRTC(socket, roomId) {
       cancelled = true;
     };
   }, []);
+
+  // When localStream becomes available AFTER peer connections already exist,
+  // add the tracks to every existing peer connection and renegotiate
+  useEffect(() => {
+    if (!localStream) return;
+
+    Object.entries(peersRef.current).forEach(([targetSocketId, { peerConnection }]) => {
+      // Check if tracks are already added
+      const senders = peerConnection.getSenders();
+      const existingTrackIds = new Set(senders.map(s => s.track?.id).filter(Boolean));
+      const newTracks = localStream.getTracks().filter(t => !existingTrackIds.has(t.id));
+
+      if (newTracks.length === 0) return;
+
+      // Add the new tracks
+      newTracks.forEach((track) => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      // Renegotiate
+      (async () => {
+        try {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          if (socketRef.current) {
+            socketRef.current.emit('offer', { to: targetSocketId, offer });
+          }
+        } catch (err) {
+          console.error('Error renegotiating after adding tracks:', err);
+        }
+      })();
+    });
+  }, [localStream]);
 
   // Socket event handlers for WebRTC signaling
   useEffect(() => {
@@ -234,7 +278,6 @@ export default function useWebRTC(socket, roomId) {
 
     // Receive an offer from another user
     const handleOffer = async ({ from, offer }) => {
-      // Reuse existing connection if it's still alive (renegotiation scenario)
       let pc;
       const existingPeer = peersRef.current[from];
       if (existingPeer && existingPeer.peerConnection.signalingState !== 'closed') {
@@ -349,27 +392,36 @@ export default function useWebRTC(socket, roomId) {
       const screenTrack = screenStream.getVideoTracks()[0];
       screenStreamRef.current = screenStream;
 
-      // Save the original camera video track
       const originalTrack = localStreamRef.current
         ? localStreamRef.current.getVideoTracks()[0]
         : null;
       originalVideoTrackRef.current = originalTrack;
 
       // Replace or add video track in all peer connections
-      Object.values(peersRef.current).forEach(({ peerConnection }) => {
+      Object.entries(peersRef.current).forEach(([targetSocketId, { peerConnection }]) => {
         const sender = peerConnection
           .getSenders()
           .find((s) => s.track && s.track.kind === 'video');
         if (sender) {
           sender.replaceTrack(screenTrack);
         } else if (peerConnection.signalingState !== 'closed') {
-          // No video sender exists (no camera), add the screen track
-          // onnegotiationneeded will handle renegotiation automatically
           peerConnection.addTrack(screenTrack, screenStream);
+          // Renegotiate
+          (async () => {
+            try {
+              const offer = await peerConnection.createOffer();
+              await peerConnection.setLocalDescription(offer);
+              if (socketRef.current) {
+                socketRef.current.emit('offer', { to: targetSocketId, offer });
+              }
+            } catch (err) {
+              console.error('Screen share renegotiation error:', err);
+            }
+          })();
         }
       });
 
-      // Update local stream for local display
+      // Update local stream for display
       if (localStreamRef.current) {
         if (originalTrack) {
           localStreamRef.current.removeTrack(originalTrack);
@@ -382,7 +434,6 @@ export default function useWebRTC(socket, roomId) {
       }
       setIsScreenSharing(true);
 
-      // When user clicks the browser's "Stop sharing" button
       screenTrack.onended = () => {
         stopScreenShare();
       };
@@ -395,7 +446,6 @@ export default function useWebRTC(socket, roomId) {
   const stopScreenShare = useCallback(() => {
     const originalTrack = originalVideoTrackRef.current;
 
-    // Replace screen track with camera track or remove it
     Object.values(peersRef.current).forEach(({ peerConnection }) => {
       const sender = peerConnection
         .getSenders()
@@ -409,13 +459,11 @@ export default function useWebRTC(socket, roomId) {
       }
     });
 
-    // Stop screen stream
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
     }
 
-    // Restore local stream
     if (localStreamRef.current) {
       const currentScreenTrack = localStreamRef.current.getVideoTracks()[0];
       if (currentScreenTrack) {
@@ -425,7 +473,6 @@ export default function useWebRTC(socket, roomId) {
         localStreamRef.current.addTrack(originalTrack);
         setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
       } else {
-        // No camera to restore, keep audio-only or empty
         const audioTracks = localStreamRef.current.getAudioTracks();
         if (audioTracks.length > 0) {
           setLocalStream(new MediaStream(audioTracks));
