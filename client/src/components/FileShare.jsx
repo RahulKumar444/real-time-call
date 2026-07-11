@@ -30,7 +30,9 @@ export default function FileShare({ socket, roomId }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleFileShared = ({ fileData }) => {
+    const handleFileShared = (data) => {
+      const fileData = data?.fileData || data;
+      if (!fileData) return;
       setFiles((prev) => {
         // Avoid duplicates
         if (prev.some((f) => f._id === fileData._id)) return prev;

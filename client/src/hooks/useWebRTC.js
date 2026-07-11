@@ -27,7 +27,6 @@ export default function useWebRTC(socket, roomId) {
   const peersRef = useRef({});
   const pendingCandidatesRef = useRef({});
   const socketRef = useRef(socket);
-  const mediaReadyRef = useRef(false);
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState({});
@@ -35,6 +34,7 @@ export default function useWebRTC(socket, roomId) {
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isMediaInitialized, setIsMediaInitialized] = useState(false);
   const screenStreamRef = useRef(null);
   const originalVideoTrackRef = useRef(null);
 
@@ -136,6 +136,19 @@ export default function useWebRTC(socket, roomId) {
         console.log(`[WebRTC] ${targetSocketId} ICE state: ${pc.iceConnectionState}`);
       };
 
+      // Handle negotiation needed (for screen share renegotiation)
+      pc.onnegotiationneeded = async () => {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (socketRef.current) {
+            socketRef.current.emit('offer', { to: targetSocketId, offer });
+          }
+        } catch (err) {
+          console.error('Negotiation error:', err);
+        }
+      };
+
       peersRef.current[targetSocketId] = { peerConnection: pc, userName };
       return pc;
     },
@@ -158,10 +171,10 @@ export default function useWebRTC(socket, roomId) {
           return;
         }
         localStreamRef.current = stream;
-        mediaReadyRef.current = true;
         setLocalStream(stream);
         setIsAudioEnabled(true);
         setIsVideoEnabled(true);
+        setIsMediaInitialized(true);
         return;
       } catch (err) {
         console.warn('Camera+mic not available:', err.message);
@@ -178,10 +191,10 @@ export default function useWebRTC(socket, roomId) {
           return;
         }
         localStreamRef.current = audioStream;
-        mediaReadyRef.current = true;
         setLocalStream(audioStream);
         setIsAudioEnabled(true);
         setIsVideoEnabled(false);
+        setIsMediaInitialized(true);
         return;
       } catch (err) {
         console.warn('Mic not available:', err.message);
@@ -189,9 +202,9 @@ export default function useWebRTC(socket, roomId) {
 
       // No devices — proceed without
       console.log('No media devices available');
-      mediaReadyRef.current = true;
       setIsAudioEnabled(false);
       setIsVideoEnabled(false);
+      setIsMediaInitialized(true);
     };
 
     initMedia();
@@ -201,42 +214,9 @@ export default function useWebRTC(socket, roomId) {
     };
   }, []);
 
-  // When localStream becomes available AFTER peer connections already exist,
-  // add the tracks to every existing peer connection and renegotiate
-  useEffect(() => {
-    if (!localStream) return;
-
-    Object.entries(peersRef.current).forEach(([targetSocketId, { peerConnection }]) => {
-      // Check if tracks are already added
-      const senders = peerConnection.getSenders();
-      const existingTrackIds = new Set(senders.map(s => s.track?.id).filter(Boolean));
-      const newTracks = localStream.getTracks().filter(t => !existingTrackIds.has(t.id));
-
-      if (newTracks.length === 0) return;
-
-      // Add the new tracks
-      newTracks.forEach((track) => {
-        peerConnection.addTrack(track, localStream);
-      });
-
-      // Renegotiate
-      (async () => {
-        try {
-          const offer = await peerConnection.createOffer();
-          await peerConnection.setLocalDescription(offer);
-          if (socketRef.current) {
-            socketRef.current.emit('offer', { to: targetSocketId, offer });
-          }
-        } catch (err) {
-          console.error('Error renegotiating after adding tracks:', err);
-        }
-      })();
-    });
-  }, [localStream]);
-
   // Socket event handlers for WebRTC signaling
   useEffect(() => {
-    if (!socket || !roomId) return;
+    if (!socket || !roomId || !isMediaInitialized) return;
 
     // Join the room
     socket.emit('join-room', { roomId });
@@ -358,7 +338,7 @@ export default function useWebRTC(socket, roomId) {
       socket.emit('leave-room', { roomId });
       closeAllPeerConnections();
     };
-  }, [socket, roomId, createPeerConnection, closePeerConnection, closeAllPeerConnections, processPendingCandidates]);
+  }, [socket, roomId, isMediaInitialized, createPeerConnection, closePeerConnection, closeAllPeerConnections, processPendingCandidates]);
 
   // Toggle audio
   const toggleAudio = useCallback(() => {
@@ -406,18 +386,6 @@ export default function useWebRTC(socket, roomId) {
           sender.replaceTrack(screenTrack);
         } else if (peerConnection.signalingState !== 'closed') {
           peerConnection.addTrack(screenTrack, screenStream);
-          // Renegotiate
-          (async () => {
-            try {
-              const offer = await peerConnection.createOffer();
-              await peerConnection.setLocalDescription(offer);
-              if (socketRef.current) {
-                socketRef.current.emit('offer', { to: targetSocketId, offer });
-              }
-            } catch (err) {
-              console.error('Screen share renegotiation error:', err);
-            }
-          })();
         }
       });
 

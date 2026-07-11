@@ -9,16 +9,6 @@ const router = express.Router();
 
 // --- Multer configuration ---------------------------------------------------
 
-const ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'application/pdf',
-  'text/plain',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
-
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '../../uploads'),
   filename: (_req, file, cb) => {
@@ -32,13 +22,6 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_TYPES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('File type not allowed'), false);
-    }
-  },
 });
 
 // --- Routes -----------------------------------------------------------------

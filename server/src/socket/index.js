@@ -93,7 +93,7 @@ function registerSocketHandlers(io) {
 
     // --- File sharing -----------------------------------------------------
     socket.on('file-shared', ({ roomId, fileData }) => {
-      socket.to(roomId).emit('file-shared', fileData);
+      socket.to(roomId).emit('file-shared', { fileData });
     });
 
     // --- Disconnect -------------------------------------------------------
